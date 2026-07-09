@@ -1,0 +1,9 @@
+{
+  "name": "feishu-notify",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./feishu-notify.js",
+  "exports": "./feishu-notify.js",
+  "description": "opencode plugin: push notifications to Feishu (Lark) custom bot",
+  "keywords": ["opencode", "opencode-plugin", "feishu", "lark", "notification"]
+}
