@@ -99,12 +99,22 @@ ${notificationText}
 
 export const FeishuNotifyPlugin = async () => {
   const config = loadConfig()
+  // 子 agent 会话登记表：session.created 时按 info.parentID 登记，其余事件据此静音
+  const subagentSessions = new Set()
   log(`FeishuNotifyPlugin 已注册 event handler (config加载=${config ? "成功" : "失败"})`)
 
   return {
     event: async ({ event }) => {
       if (!config) return
       const props = event.properties || {}
+      const sessionID = props.sessionID
+      // 子 agent 会话静音：idle/status/error 命中登记集合即跳过；
+      // permission.asked 按需保留通知，created/deleted 自行维护集合，故排除。
+      const muted =
+        event.type !== "permission.asked" &&
+        event.type !== "session.created" &&
+        event.type !== "session.deleted"
+      if (muted && sessionID && subagentSessions.has(sessionID)) return
       let hookType = null
       let notificationText = ""
 
@@ -130,6 +140,10 @@ export const FeishuNotifyPlugin = async () => {
           notificationText = "opencode 已完成任务，正在等待你的输入"
           break
         case "session.created":
+          if (props.info?.parentID) {
+            subagentSessions.add(sessionID)
+            return
+          }
           hookType = "SessionStart"
           notificationText = "新会话已开始"
           break
@@ -138,6 +152,10 @@ export const FeishuNotifyPlugin = async () => {
           notificationText = `任务执行出错：${props.error?.data?.message || props.error?.name || "未知"}`
           break
         case "session.deleted":
+          if (props.info?.parentID) {
+            subagentSessions.delete(sessionID)
+            return
+          }
           hookType = "Stop"
           notificationText = "会话已结束"
           break
