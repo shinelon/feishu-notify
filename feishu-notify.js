@@ -108,14 +108,21 @@ export const FeishuNotifyPlugin = async () => {
       if (!config) return
       const props = event.properties || {}
       const sessionID = props.sessionID
-      // 子 agent 会话静音：idle/status/error 命中登记集合即跳过；
-      // permission.asked 按需保留通知，created/deleted 自行维护集合，故排除。
+      // 子 agent 会话静音：命中登记集合即跳过（permission.asked 按需保留通知，
+      // created/deleted 自行维护集合，故排除）。仅对会影响通知的事件记日志，
+      // 跳过 message.part.delta 等高频流式事件，避免日志刷屏。
       const muted =
         event.type !== "permission.asked" &&
         event.type !== "session.created" &&
         event.type !== "session.deleted"
       if (muted && sessionID && subagentSessions.has(sessionID)) {
-        log(`子agent事件已静音 type=${event.type} session=${sessionID}`)
+        if (
+          event.type === "session.idle" ||
+          event.type === "session.status" ||
+          event.type === "session.error"
+        ) {
+          log(`子agent事件已静音 type=${event.type} session=${sessionID}`)
+        }
         return
       }
       let hookType = null
