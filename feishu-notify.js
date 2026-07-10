@@ -37,7 +37,7 @@ function generateSignature(timestamp, secret) {
   return createHmac("sha256", stringToSign).update("").digest("base64")
 }
 
-async function sendFeishu(config, notificationText, hookType) {
+async function sendFeishu(config, notificationText, hookType, sessionID) {
   const timestamp = String(Math.floor(Date.now() / 1000))
   const signature = generateSignature(timestamp, config.secret)
   const triggerTime = new Date().toLocaleString("zh-CN", { hour12: false })
@@ -84,7 +84,7 @@ ${notificationText}
     })
     const result = await resp.json()
     if (result.code === 0) {
-      log(`发送成功 hook=${hookType}`)
+      log(`发送成功 hook=${hookType} session=${sessionID ?? "-"}`)
       return true
     }
     log(`!!! 飞书返回失败: ${JSON.stringify(result)}`)
@@ -114,7 +114,10 @@ export const FeishuNotifyPlugin = async () => {
         event.type !== "permission.asked" &&
         event.type !== "session.created" &&
         event.type !== "session.deleted"
-      if (muted && sessionID && subagentSessions.has(sessionID)) return
+      if (muted && sessionID && subagentSessions.has(sessionID)) {
+        log(`子agent事件已静音 type=${event.type} session=${sessionID}`)
+        return
+      }
       let hookType = null
       let notificationText = ""
 
@@ -142,6 +145,7 @@ export const FeishuNotifyPlugin = async () => {
         case "session.created":
           if (props.info?.parentID) {
             subagentSessions.add(sessionID)
+            log(`子agent会话已登记并静音 session=${sessionID}`)
             return
           }
           hookType = "SessionStart"
@@ -154,6 +158,7 @@ export const FeishuNotifyPlugin = async () => {
         case "session.deleted":
           if (props.info?.parentID) {
             subagentSessions.delete(sessionID)
+            log(`子agent会话已移除登记 session=${sessionID}`)
             return
           }
           hookType = "Stop"
@@ -163,7 +168,7 @@ export const FeishuNotifyPlugin = async () => {
           return
       }
 
-      await sendFeishu(config, notificationText, hookType)
+      await sendFeishu(config, notificationText, hookType, sessionID)
     },
   }
 }
