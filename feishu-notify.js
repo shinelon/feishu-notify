@@ -177,7 +177,9 @@ async function handleEvent(config, event, subagentSessions) {
   // 事件自带 location（会话所在目录），比 process.cwd() 更准确
   const projectDir = event.location?.directory || process.cwd()
   // 不阻塞事件流：发送失败只记录，绝不影响 opencode 主流程
-  void sendFeishu(config, notificationText, hookType, sessionID, projectDir).catch(() => {})
+  void sendFeishu(config, notificationText, hookType, sessionID, projectDir).catch((e) =>
+    log(`!!! 发送流程异常: ${e?.message}`)
+  )
 }
 
 export default {
