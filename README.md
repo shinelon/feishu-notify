@@ -1,10 +1,10 @@
 # feishu-notify
 
-[opencode](https://opencode.ai) 插件：在会话开始、任务完成、需要授权、出错等事件发生时，向**飞书（Lark）自定义机器人**推送通知。
+[opencode](https://opencode.ai) **V2** 插件：在会话开始、任务完成、需要授权、出错等事件发生时，向**飞书（Lark）自定义机器人**推送通知。要求 opencode 2.x（V1 版插件见 `master` 分支历史版本）。
 
 ## 工作原理
 
-- 订阅 opencode 事件：`session.created` / `session.idle` / `session.status`(retry) / `session.error` / `session.deleted` / `permission.asked`。
+- 以 V2 插件 API（`default export { id, setup(ctx) }`）注册，通过 `ctx.event.subscribe()` 订阅 opencode 事件流：`session.created` / `session.execution.succeeded` / `session.status`(retry) / `session.execution.failed` / `session.deleted` / `permission.asked`。
 - 使用飞书自定义机器人 webhook + 签名校验（HMAC-SHA256 + Base64）发送文本消息。
 - 仅依赖 Node 内置模块（`crypto` / `fs` / `fetch`），无第三方依赖。
 
@@ -40,10 +40,10 @@
 
 ### 3. 注册插件
 
-编辑 `~/.config/opencode/opencode.json`，在 `plugin` 数组中加入：
+编辑 `~/.config/opencode/opencode.json`，在 `plugins` 数组中加入（V2 配置字段为复数 `plugins`）：
 
 ```json
-"feishu-notify@git+https://github.com/shinelon/feishu-notify.git"
+"feishu-notify@git+https://github.com/shinelon/feishu-notify.git#feat/v2-plugin"
 ```
 
 然后**重启 opencode**。触发任意会话/权限事件，飞书群应收到通知；查看 `plugin.log` 出现 `发送成功` 即正常。
@@ -57,11 +57,15 @@
 | 事件 | 通知类型 |
 |---|---|
 | `session.created` | 会话开始 🆕 |
-| `session.idle` | 需要用户输入 🔔 |
+| `session.execution.succeeded` | 需要用户输入 🔔 |
 | `session.status` (retry) | 需要用户输入 🔔 |
 | `permission.asked` | 需要授权 🔐 |
-| `session.error` | 任务结束 ✅ |
+| `session.execution.failed` | 任务结束 ✅ |
 | `session.deleted` | 任务结束 ✅ |
+
+> V2 中 `session.idle` / `session.error` 已不再发射，回合结束改由 `session.execution.*` 事件表达。
+
+子 agent（派生的子会话）静默处理：`session.created` 带 `parentID` 的会话会被登记，其后续事件（完成/出错等）不再转发通知；权限请求例外，仍会通知。
 
 ## 安全提示
 
@@ -70,5 +74,5 @@
 
 ## 已知限制
 
-- `session.idle` 在每轮助手回合结束都会触发，交互式会话中通知较频繁（后续可加去噪/节流）。
-- 配置在 opencode 启动时加载一次，修改 `config.json` 后需重启 opencode 生效。
+- `session.execution.succeeded` 在每轮助手回合结束都会触发，交互式会话中通知较频繁（后续可加去噪/节流）。
+- 配置在插件加载时读取一次，修改 `config.json` 后需重启 opencode 生效。
